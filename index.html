@@ -367,11 +367,11 @@ async function near(){const L=todayList(),pend=L.filter(o=>o.e==="pendiente"),do
 /* ---------- pedidos: capturar, estado, ticket ---------- */
 const stFields=(o,e,m)=>e==="pendiente"?{e,m:null,ent:null,cob:null}:e==="entregado"?{e,m:null,ent:o.ent||ymd(),cob:null}:{e,m:m||"Efectivo",ent:o.ent||ymd(),cob:ymd()};
 function openOrder(o,f,cid){
- if(!C.length||!PR.length){const needP=!PR.length;sheet(`<div class="shh"><h2>Falta información</h2><button class="btn o sm" data-a="x">Cerrar</button></div><div class="empty">${ico(needP?"aguacate":"caja",64)}<b>${needP?"Aún no tienes productos":"Aún no tienes restaurantes"}</b>Para armar un pedido necesitas al menos un restaurante y un producto.</div><button class="btn w" id="goC">${needP?"Crear productos":"Agregar restaurantes"}</button>`,()=>{$("#goC").onclick=()=>{closeSheet();ctab=needP?"Productos":"Restaurantes";go("cli");};});return;}
- const cur=o||{cid:cid||C[0].id,f:f||ymd(),e:"pendiente",m:"Efectivo"};
+ if(!C.length||!PR.length){const needP=C.length>0&&!PR.length;sheet(`<div class="shh"><h2>Añadir pedido</h2><button class="btn o sm" data-a="x">Cerrar</button></div><div class="empty">${ico(needP?"aguacate":"caja",64)}<b>${needP?"Primero crea tus productos":"Primero agrega un restaurante"}</b>${needP?"Crea los productos que vendes (aguacate, limón…) y después haz tu pedido.":"Guarda el restaurante al que le vas a entregar y después haz su pedido."}</div><button class="btn w" id="goC">${needP?"Crear productos":"Agregar restaurante"}</button>`,()=>{$("#goC").onclick=()=>{closeSheet();if(needP){ctab="Productos";go("cli");}else{ctab="Restaurantes";go("cli");openClient(null);}};});return;}
+ const cur=o||{cid:cid||"",f:f||ymd(),e:"pendiente",m:"Efectivo"};
  const S={pid:o?o.pid:null,md:o&&o.md==="kg"?"kg":"caja"};
  sheet(`<div class="shh"><h2>${o?"Editar pedido":"Añadir pedido"}</h2><button class="btn o sm" data-a="x">Cerrar</button></div>
- <div class="f"><div class="w"><label for="oc">Restaurante</label><select id="oc">${C.map(c=>`<option value="${c.id}" ${c.id===cur.cid?"selected":""}>${esc(c.n)}</option>`).join("")}</select></div></div>
+ <div class="f"><div class="w"><label for="oc">Restaurante</label><select id="oc">${o?"":`<option value="">Selecciona un restaurante…</option>`}${C.map(c=>`<option value="${c.id}" ${c.id===cur.cid?"selected":""}>${esc(c.n)}</option>`).join("")}</select></div></div>
  <div id="osuc" hidden style="margin-top:12px"></div>
  <div id="oprod" style="margin-top:12px"></div>
  <div id="obody">
@@ -423,7 +423,7 @@ function openOrder(o,f,cid){
    box.querySelectorAll(".scb").forEach(x=>x.onchange=()=>{x.checked?sel0.add(x.value):sel0.delete(x.value);});
    $("#sall").onclick=()=>{box.querySelectorAll(".scb").forEach(x=>{x.checked=true;sel0.add(x.value);});};};
   const sucsNow=()=>$("#osuc").hidden?[]:[...document.querySelectorAll("#osuc .scb:checked")].map(x=>x.value);
-  const start=init=>{renderSuc();if(renderProds())fillProd(init);};
+  const start=init=>{if(!cidv()){$("#oprod").innerHTML="";$("#osuc").hidden=true;$("#obody").hidden=true;return;}renderSuc();if(renderProds())fillProd(init);};
   $("#oc").onchange=()=>{sel0.clear();start(false);};
   $("#mc").onclick=()=>{S.md="caja";$("#oq").value=1;setPrice(false);};
   $("#mk").onclick=()=>{S.md="kg";$("#oq").value=10;setPrice(false);};
