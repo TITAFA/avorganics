@@ -16,7 +16,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{margin:0}
+html,body{margin:0;overscroll-behavior:none}
+html{-webkit-text-size-adjust:100%}
+body.kb nav{display:none}
 [hidden]{display:none!important}
 img{max-width:100%}
 
@@ -119,9 +121,9 @@ nav button[aria-selected="true"]{background:var(--olive);color:var(--on)}
 .dp{background:var(--pend)}.dv{background:var(--grass)}.dg{background:#c9a227}
 .leg{display:flex;gap:12px;flex-wrap:wrap;font-size:.76rem;color:var(--mu);margin-top:10px}
 .leg i{margin-right:4px}
-#auth{position:fixed;inset:0;z-index:45;background:var(--bg);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:28px max(16px,env(safe-area-inset-left,0px))}
+#auth{position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;z-index:45;background:var(--bg);overflow-y:auto;overscroll-behavior:contain;display:flex;align-items:flex-start;justify-content:center;padding:10px max(16px,env(safe-area-inset-left,0px)) 40vh}
 #auth .ac{width:100%;max-width:420px}
-#alogo{height:110px;width:auto;display:block;margin:0 auto 14px}
+#alogo{height:64px;width:auto;display:block;margin:0 auto 6px}
 #auth h2{text-align:center;margin-bottom:10px}
 #auth label{margin-top:10px}
 .err{color:var(--pend);font-weight:700;font-size:.88rem;margin:8px 0 0;min-height:1.2em}
@@ -574,7 +576,7 @@ const parseCfg=t=>{const o={};String(t).replace(/([A-Za-z]+)\s*:\s*["']([^"']+)[
 const AERR={"auth/invalid-credential":"Correo o contraseña incorrectos.","auth/wrong-password":"Correo o contraseña incorrectos.","auth/user-not-found":"Ese correo no tiene cuenta. Toca «Crear cuenta».","auth/invalid-email":"Revisa el correo.","auth/email-already-in-use":"Ese correo ya tiene cuenta. Toca «Entrar».","auth/weak-password":"La contraseña necesita al menos 6 caracteres.","auth/network-request-failed":"No hay internet.","auth/operation-not-allowed":"Falta activar Correo/Contraseña en Firebase, en Authentication.","auth/too-many-requests":"Demasiados intentos. Espera un momento."};
 const bkLabel=()=>{let d=null;try{d=localStorage.getItem("avo-bk");}catch(e){}$("#bk").textContent="Tus datos están en tu cuenta. El respaldo automático guarda una copia al día en la misma cuenta, la primera vez que abres la app ese día, y conserva 14 días. Para protegerte si borras el proyecto de Firebase, descarga además un archivo cada semana. Restaurar agrega y reemplaza registros. "+(d?"Último respaldo: "+fmt(d)+".":"Aún no has hecho un respaldo.");};
 function showAuth(title,html){$("#alogo").src=LOGO;$("#at").textContent=title;$("#ab").innerHTML=html;$("#auth").hidden=false;}
-function showSetup(){showAuth("Conectar con Firebase",`<p class="hint">Solo la primera vez en este teléfono. Pega la configuración que te da Firebase, el bloque que empieza con const firebaseConfig.</p><label for="fc">Configuración</label><textarea id="fc" rows="8" placeholder='apiKey: "…", authDomain: "…", projectId: "…", appId: "…"'></textarea><button class="btn w" id="fs" style="margin-top:10px">Guardar y continuar</button><p class="err" id="fe"></p>`);
+function showSetup(){showAuth("Conectar con Firebase",`<p class="hint">Solo la primera vez en este teléfono. Pega la configuración que te da Firebase, el bloque que empieza con const firebaseConfig.</p><label for="fc">Configuración</label><textarea id="fc" rows="4" placeholder='apiKey: "…", authDomain: "…", projectId: "…", appId: "…"'></textarea><button class="btn w" id="fs" style="margin-top:10px">Guardar y continuar</button><p class="err" id="fe"></p>`);
  $("#fs").onclick=()=>{const c=parseCfg($("#fc").value);if(!c){$("#fe").textContent="No encuentro apiKey, projectId y appId en lo que pegaste. Copia el bloque completo.";return;}try{localStorage.setItem(FBK,JSON.stringify(c));}catch(e){}location.reload();};}
 function showLogin(auth){showAuth("Entrar a Avorganics",`<form id="lf"><label for="le">Correo</label><input id="le" type="email" autocomplete="username" inputmode="email"><label for="lp">Contraseña</label><input id="lp" type="password" autocomplete="current-password"><button class="btn w" id="li" type="submit" style="margin-top:14px">Entrar</button></form><button class="btn o w" id="lc" type="button" style="margin-top:8px">Crear cuenta (solo la primera vez)</button><p class="err" id="lerr"></p><p class="hint">En el segundo teléfono usa el mismo correo y contraseña y toca Entrar.</p><button class="btn o sm" id="lx" type="button">Cambiar configuración de Firebase</button>`);
  const go=async create=>{const em=$("#le").value.trim(),pw=$("#lp").value;if(!em||!pw){$("#lerr").textContent="Escribe tu correo y contraseña.";return;}
@@ -636,6 +638,9 @@ function startApp(user){
 })();
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+
+document.addEventListener("focusin",e=>{if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)){document.body.classList.add("kb");setTimeout(()=>{try{e.target.scrollIntoView({block:"center"});}catch(x){}},300);}});
+document.addEventListener("focusout",()=>{setTimeout(()=>{if(!/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement||{}).tagName||""))document.body.classList.remove("kb");},150);});
 </script>
 
 </body></html>
