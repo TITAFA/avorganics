@@ -258,11 +258,18 @@ function fx(kind,amt){const m=FXM[kind][Math.floor(Math.random()*FXM[kind].lengt
 async function W(fn,ok){if(!DB){toast("Sin conexión con la base compartida");return false;}try{await fn();if(ok)toast(ok);return true;}catch(e){toast("No se pudo guardar ("+((e&&e.code)||"error")+")");return false;}}
 function arm(btn,fn,label){const id=btn.dataset.id||btn.id||"x";if(armed===id){armed=null;fn();return;}armed=id;const old=btn.textContent;btn.textContent="¿Seguro? Toca otra vez";setTimeout(()=>{if(armed===id){armed=null;btn.textContent=label||old;}},3000);}
 const tot=o=>o.q*o.p;
+const uq=o=>o.md==="kg"?o.q/10:o.q;
+const R1=n=>Math.round(n*10)/10;
+const qty=o=>o.md==="kg"?o.q+" kg":(/caja/i.test(o.u||"")?o.q+(o.q==1?" caja":" cajas"):String(o.q));
+const pname=o=>(o.pn||"Aguacate Hass")+(o.cal?" · "+o.cal:"");
+const isBox=p=>!!p&&/caja/i.test(p.u||"");
+const plistK=p=>p&&Array.isArray(p.plk)?p.plk:[];
+const calList=p=>p&&Array.isArray(p.cal)?p.cal:[];
 const cl=id=>C.find(c=>c.id===id);
 const prod=id=>PR.find(p=>p.id===id);
 const plist=p=>p?(Array.isArray(p.pl)?p.pl:(p.p!=null?[p.p]:[])):[];
-const lastPrice=(cid,pid)=>{const L=P.filter(o=>o.cid===cid&&o.pid===pid).sort((a,b)=>(b.cr||0)-(a.cr||0));return L.length?L[0].p:null;};
-const priceFor=(cid,pid)=>{const lp=lastPrice(cid,pid);if(lp!=null)return lp;const l=plist(prod(pid));return l.length?l[0]:0;};
+const lastPrice=(cid,pid,md,cal)=>{const L=P.filter(o=>o.cid===cid&&o.pid===pid&&(o.md==='kg'?'kg':'caja')===md&&(o.cal||'')===(cal||'')).sort((a,b)=>(b.cr||0)-(a.cr||0));return L.length?L[0].p:null;};
+const priceFor=(cid,pid,md,cal)=>{const lp=lastPrice(cid,pid,md,cal);if(lp!=null)return lp;const pp=prod(pid),l=md==='kg'?plistK(pp):plist(pp);return l.length?l[0]:0;};
 function coords(s){s=String(s||"");const m=s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||s.match(/(?:^|[?&=\s])(-?\d{1,2}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/);return m?[+m[1],+m[2]]:null;}
 const hv=(a,b)=>{const r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 12742*Math.asin(Math.sqrt(h));};
 const sales=()=>P.filter(o=>o.e!=="pendiente").map(o=>Object.assign({},o,{d:o.ent||o.f}));
@@ -296,7 +303,7 @@ if(o.e==="pendiente")b+=`<button class="btn sm" data-a="ent" data-id="${o.id}">M
 if(o.e==="entregado")b+=`<button class="btn sm" data-a="cob" data-id="${o.id}">Marcar cobrado</button>`;
 if(o.e!=="pendiente")b+=`<button class="btn o sm" data-a="tk" data-id="${o.id}">Ticket</button>`;
 b+=`<button class="btn o sm" data-a="edito" data-id="${o.id}">Editar</button>`;
-return `<div class="o ${o.e}"><div class="oh"><div>${opt.n?`<span class="n">${opt.n}</span>`:""}<b>${esc(o.cn)}</b><div class="sub">${esc(o.pn||"Aguacate Hass")} · ${o.q} × ${M(o.p)} = <b>${M(tot(o))}</b></div>${late?`<div class="sub late">Pendiente desde ${fmt(o.f)}</div>`:""}${opt.date?`<div class="sub">${fmt(o.f)}</div>`:""}</div><span class="tag ${o.e}">${TAG[o.e]}${o.e==="cobrado"?" · "+esc(o.m):""}</span></div><div class="ob">${b}</div></div>`;}
+return `<div class="o ${o.e}"><div class="oh"><div>${opt.n?`<span class="n">${opt.n}</span>`:""}<b>${esc(o.cn)}</b><div class="sub">${esc(pname(o))} · ${qty(o)} × ${M(o.p)} = <b>${M(tot(o))}</b></div>${late?`<div class="sub late">Pendiente desde ${fmt(o.f)}</div>`:""}${opt.date?`<div class="sub">${fmt(o.f)}</div>`:""}</div><span class="tag ${o.e}">${TAG[o.e]}${o.e==="cobrado"?" · "+esc(o.m):""}</span></div><div class="ob">${b}</div></div>`;}
 function stopQ(o){const c=cl(o.cid)||{};const k=coords(c.a);if(k)return k.join(",");if(c.a&&!/^https?:/i.test(c.a))return c.a;return c.n||o.cn;}
 function renderHoy(){
 $("#hF").textContent=new Date().toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"});
@@ -304,7 +311,7 @@ $("#hTabs").innerHTML=chipsH([["hoy","Hoy"],["prox","Próximos"]],tab,"tab");
 const t=ymd();
 if(tab==="hoy"){
  const L=todayList(),pend=L.filter(o=>o.e==="pendiente");
- $("#hK").innerHTML=`<div class="kpis"><div class="k"><b>${L.reduce((a,o)=>a+o.q,0)}</b><span>unidades del día</span></div><div class="k"><b>${M(L.reduce((a,o)=>a+tot(o),0))}</b><span>total</span></div><div class="k ${pend.length?"neg":""}"><b>${pend.length}</b><span>por entregar</span></div></div>`;
+ $("#hK").innerHTML=`<div class="kpis"><div class="k"><b>${R1(L.reduce((a,o)=>a+uq(o),0))}</b><span>cajas del día</span></div><div class="k"><b>${M(L.reduce((a,o)=>a+tot(o),0))}</b><span>total</span></div><div class="k ${pend.length?"neg":""}"><b>${pend.length}</b><span>por entregar</span></div></div>`;
  let n=0;
  $("#hL").innerHTML=L.length?L.map(o=>oc(o,{route:true,n:o.e==="pendiente"?++n:0})).join(""):`<div class="card empty"><b>Sin pedidos para hoy</b>Toca «+ Añadir», elige un restaurante guardado y el precio sale solo.</div>`;
  if(pend.length){const stops=pend.map(stopQ),dest=stops[stops.length-1],wp=stops.slice(0,-1);
@@ -339,46 +346,63 @@ function openOrder(o,f,cid){
  sheet(`<div class="shh"><h2>${o?"Editar pedido":"Añadir pedido"}</h2><button class="btn o sm" data-a="x">Cerrar</button></div>
  <div class="f"><div class="w"><label for="oc">Restaurante</label><select id="oc">${C.map(c=>`<option value="${c.id}" ${c.id===cur.cid?"selected":""}>${esc(c.n)}</option>`).join("")}</select></div>
  <div class="w"><label for="opr">Producto</label><select id="opr">${pOpts}</select></div>
- <div><label for="oq" id="ol">Cantidad</label><input id="oq" type="number" inputmode="numeric" min="1" value="${cur.q}"></div>
- <div><label for="ops">Precio de venta</label><select id="ops"></select></div>
+ <div id="ocw"><label for="oca">Calibre</label><select id="oca"></select></div>
+ <div id="omw"><label for="omd">Se vende por</label><select id="omd"><option value="caja">Caja (10 kg)</option><option value="kg">Kilos</option></select></div>
+ <div><label for="oq" id="ol">Cantidad</label><input id="oq" type="number" inputmode="decimal" step="any" min="0" value="${cur.q}"></div>
+ <div><label for="ops" id="opl">Precio de venta</label><select id="ops"></select></div>
  <div class="w" id="oow" hidden><label for="op">Otro precio (MXN)</label><input id="op" type="number" inputmode="decimal" min="0"></div>
  <div class="w" id="oaw" hidden><label style="display:flex;gap:8px;align-items:center;font-weight:500;color:var(--ink);font-size:.9rem"><input id="osv" type="checkbox" checked style="width:22px;height:22px;margin:0;min-height:0"> Agregar este precio a la lista del producto</label></div>
- <div><label for="ok">Costo por unidad</label><input id="ok" type="number" inputmode="decimal" min="0" placeholder="Opcional" value="${k0}"></div>
+ <div><label for="ok" id="okl">Costo por unidad</label><input id="ok" type="number" inputmode="decimal" min="0" placeholder="Opcional" value="${k0}"></div>
  <div><label for="of">Fecha</label><input id="of" type="date" value="${cur.f}"></div>
  ${o?`<div><label for="oe">Estado</label><select id="oe">${["pendiente","entregado","cobrado"].map(e=>`<option value="${e}" ${e===cur.e?"selected":""}>${TAG[e]}</option>`).join("")}</select></div><div><label for="om">Forma de pago</label><select id="om">${["Efectivo","Transferencia","Tarjeta"].map(m=>`<option ${m===cur.m?"selected":""}>${m}</option>`).join("")}</select></div>`:""}</div>
  <div id="ot" class="sub" style="font-weight:700;margin:10px 0"></div>
  <button class="btn w" id="os">Guardar pedido</button>${o?`<button class="btn d w" id="od" data-id="${o.id}" style="margin-top:8px">Eliminar pedido</button>`:`<button class="btn o w" id="oa" style="margin-top:8px">Guardar y añadir otro producto</button>`}`,()=>{
   const sel=$("#ops");
-  const unit=()=>{const p=prod($("#opr").value);return p?(p.u||"pieza"):(o&&o.u?o.u:"pieza");};
+  const P0=()=>prod($("#opr").value);
+  const md=()=>{const p=P0();if(p)return isBox(p)&&$("#omd").value==="kg"?"kg":"caja";return o&&o.md==="kg"?"kg":"caja";};
+  const unit=()=>{const p=P0();return p?(p.u||"pieza"):(o&&o.u?o.u:"pieza");};
+  const costDef=()=>{const p=P0();if(!p||p.k==null)return "";return md()==="kg"?String(Math.round(p.k/10*100)/100):String(p.k);};
   const curPrice=()=>sel.value==="__o"?parseFloat($("#op").value):parseFloat(sel.value);
-  const build=pick=>{const l=plist(prod($("#opr").value)).slice();if(pick!=null&&!l.includes(pick))l.push(pick);l.sort((a,b)=>a-b);
+  const plNow=()=>md()==="kg"?plistK(P0()):plist(P0());
+  const calNow=()=>$("#ocw").hidden?"":$("#oca").value;
+  const build=pick=>{const l=plNow().slice();if(pick!=null&&!l.includes(pick))l.push(pick);l.sort((a,b)=>a-b);
    sel.innerHTML=l.map(v=>`<option value="${v}">${M(v)}</option>`).join("")+`<option value="__o">Otro precio…</option>`;
-   if(!l.length)sel.value="__o";else{const d=pick!=null?pick:priceFor($("#oc").value,$("#opr").value);sel.value=l.includes(d)?String(d):String(l[0]);}};
-  const upd=()=>{const p=prod($("#opr").value),pr=curPrice(),q=+$("#oq").value||0,k=parseFloat($("#ok").value),v=parseFloat($("#op").value);
-   $("#ol").textContent="Cantidad ("+unit()+")";$("#oow").hidden=sel.value!=="__o";
-   $("#oaw").hidden=!(p&&sel.value==="__o"&&v>=0&&!plist(p).includes(v));
+   if(!l.length)sel.value="__o";else{const d=pick!=null?pick:priceFor($("#oc").value,$("#opr").value,md(),calNow());sel.value=l.includes(d)?String(d):String(l[0]);}};
+  const fillProd=(keep)=>{const p=P0(),cs=calList(p).slice();
+   const cc=keep&&o&&o.cal?o.cal:"";if(cc&&!cs.includes(cc))cs.push(cc);
+   $("#ocw").hidden=!cs.length;$("#oca").innerHTML=cs.map(c=>`<option ${c===cc?"selected":""}>${esc(c)}</option>`).join("");
+   $("#omw").hidden=!isBox(p);
+   if(keep&&o&&o.md==="kg")$("#omd").value="kg";else if(!keep)$("#omd").value="caja";};
+  const upd=()=>{const p=P0(),pr=curPrice(),q=+$("#oq").value||0,k=parseFloat($("#ok").value),v=parseFloat($("#op").value),kg=md()==="kg";
+   $("#ol").textContent=isBox(p)||(!p&&o&&/caja/i.test(o.u||""))?(kg?"Cantidad (kilos)":"Cantidad (cajas de 10 kg)"):"Cantidad ("+unit()+")";
+   $("#opl").textContent=isBox(p)?(kg?"Precio por kilo":"Precio por caja"):"Precio de venta";
+   $("#okl").textContent=isBox(p)?(kg?"Costo por kilo":"Costo por caja"):"Costo por unidad";
+   $("#oow").hidden=sel.value!=="__o";
+   $("#oaw").hidden=!(p&&sel.value==="__o"&&v>=0&&!plNow().includes(v));
    $("#ot").textContent="Total: "+M(q*(pr||0))+(k>=0&&pr>=0?" · Ganancia estimada: "+M(q*(pr-k)):"");};
-  build(o?o.p:null);
+  fillProd(true);build(o?o.p:null);
   $("#oc").onchange=()=>{build(null);upd();};
-  $("#opr").onchange=()=>{const p=prod($("#opr").value);build(null);$("#ok").value=p&&p.k!=null?p.k:"";upd();};
+  $("#opr").onchange=()=>{fillProd(false);build(null);$("#ok").value=costDef();upd();};
+  $("#omd").onchange=()=>{build(null);$("#ok").value=costDef();upd();};
+  $("#oca").onchange=()=>{build(null);upd();};
   sel.onchange=upd;$("#op").oninput=upd;$("#oq").oninput=upd;$("#ok").oninput=upd;upd();
-  const save=async again=>{const c=cl($("#oc").value),pr=prod($("#opr").value)||(o?{id:o.pid,n:o.pn,u:o.u}:null),q=parseInt($("#oq").value),p=curPrice(),kv=$("#ok").value===""?null:parseFloat($("#ok").value),f=$("#of").value;
+  const save=async again=>{const c=cl($("#oc").value),pr=prod($("#opr").value)||(o?{id:o.pid,n:o.pn,u:o.u}:null),q=parseFloat($("#oq").value),p=curPrice(),kv=$("#ok").value===""?null:parseFloat($("#ok").value),f=$("#of").value;
    if(!c||!pr||!(q>0)||!(p>=0)||!f){toast("Revisa restaurante, producto, cantidad, precio y fecha");return;}
    if(kv!==null&&!(kv>=0)){toast("Revisa el costo");return;}
-   const base={cid:c.id,cn:c.n,pid:pr.id,pn:pr.n,u:pr.u||"pieza",q,p,k:kv,f};
+   const kgm=md()==="kg",base={cid:c.id,cn:c.n,pid:pr.id,pn:pr.n,u:pr.u||"pieza",q,p,k:kv,f,cal:calNow()||null,md:isBox(pr)||(o&&o.md)?(kgm?"kg":"caja"):null};
    const ok=await W(async()=>{
     if(o){const d=Object.assign({},base);if($("#oe").value!==o.e||($("#oe").value==="cobrado"&&$("#om").value!==o.m))Object.assign(d,stFields(o,$("#oe").value,$("#om").value));await DB.doc("pedidos/"+o.id).update(d);}
     else{const mx=Math.max(-1,...P.filter(x=>x.f===f).map(x=>x.ord==null?-1:x.ord));
      await DB.collection("pedidos").doc().set(Object.assign(base,{e:"pendiente",m:null,ent:null,cob:null,ord:mx+1,t:"AVO-"+f.replace(/-/g,"").slice(2)+"-"+Math.random().toString(36).slice(2,6).toUpperCase(),cr:Date.now()}));}
-    const pp=prod(pr.id);if(pp&&!$("#oaw").hidden&&$("#osv").checked)await DB.doc("productos/"+pp.id).update({pl:[...plist(pp),p].sort((a,b)=>a-b)});
+    const pp=prod(pr.id);if(pp&&!$("#oaw").hidden&&$("#osv").checked)await DB.doc("productos/"+pp.id).update(md()==="kg"?{plk:[...plistK(pp),p].sort((a,b)=>a-b)}:{pl:[...plist(pp),p].sort((a,b)=>a-b)});
    },o?"Pedido guardado":"");
    if(ok){closeSheet();if(!o){tab=f>ymd()?"prox":"hoy";fx("ped");}render();if(again)openOrder(null,f,c.id);}};
   $("#os").onclick=()=>save(false);if(!o)$("#oa").onclick=()=>save(true);
   if(o)$("#od").onclick=function(){arm(this,async()=>{if(await W(()=>DB.doc("pedidos/"+o.id).delete(),"Pedido eliminado"))closeSheet();},"Eliminar pedido");};
  });}
-function cobrarSheet(o){sheet(`<div class="shh"><h2>¿Cómo pagó ${esc(o.cn)}?</h2><button class="btn o sm" data-a="x">Cerrar</button></div><p class="hint">${M(tot(o))} · ${o.q} cajas</p><div style="display:grid;gap:8px">${["Efectivo","Transferencia","Tarjeta"].map(m=>`<button class="btn w" data-m="${m}">${m}</button>`).join("")}</div>`,()=>{
+function cobrarSheet(o){sheet(`<div class="shh"><h2>¿Cómo pagó ${esc(o.cn)}?</h2><button class="btn o sm" data-a="x">Cerrar</button></div><p class="hint">${M(tot(o))} · ${qty(o)}</p><div style="display:grid;gap:8px">${["Efectivo","Transferencia","Tarjeta"].map(m=>`<button class="btn w" data-m="${m}">${m}</button>`).join("")}</div>`,()=>{
  document.querySelectorAll("#sh [data-m]").forEach(b=>b.onclick=async()=>{if(await W(()=>DB.doc("pedidos/"+o.id).update(stFields(o,"cobrado",b.dataset.m)),"")){closeSheet();fx("pay",tot(o));}});});}
-function ticket(o){sheet(`<div class="shh"><h2>Ticket</h2><button class="btn o sm" data-a="x">Cerrar</button></div><div class="tk"><img src="${LOGO}" alt="Avorganics, Tacámbaro, Michoacán" style="height:96px;max-width:100%;object-fit:contain"><hr><p><b>${esc(o.cn)}</b></p><p>${fmt(o.ent||o.f)}</p><p>${esc(o.pn||"Aguacate Hass")} · ${o.q} × ${M(o.p)}</p><p style="font-size:1.3rem"><b>Total ${M(tot(o))}</b></p><p>${TAG[o.e]}${o.e==="cobrado"?" · "+esc(o.m):""}</p><div id="qr"></div><code>${esc(o.t||o.id)}</code></div>`,()=>{
+function ticket(o){sheet(`<div class="shh"><h2>Ticket</h2><button class="btn o sm" data-a="x">Cerrar</button></div><div class="tk"><img src="${LOGO}" alt="Avorganics, Tacámbaro, Michoacán" style="height:96px;max-width:100%;object-fit:contain"><hr><p><b>${esc(o.cn)}</b></p><p>${fmt(o.ent||o.f)}</p><p>${esc(pname(o))} · ${qty(o)} × ${M(o.p)}</p><p style="font-size:1.3rem"><b>Total ${M(tot(o))}</b></p><p>${TAG[o.e]}${o.e==="cobrado"?" · "+esc(o.m):""}</p><div id="qr"></div><code>${esc(o.t||o.id)}</code></div>`,()=>{
  try{new QRCode($("#qr"),{text:[o.t||o.id,o.cn,tot(o),o.e].join("|"),width:170,height:170});}catch(e){$("#qr").textContent="No se pudo generar el QR";}});}
 
 function openPago(cid){
@@ -398,11 +422,11 @@ function openPago(cid){
  });}
 
 /* ---------- Clientes ---------- */
-function stats(cid){const S=sales().filter(o=>o.cid===cid);const K=S.filter(o=>o.k!=null);return{n:S.length,costo:K.reduce((a,o)=>a+o.q*o.k,0),vk:K.reduce((a,o)=>a+tot(o),0),sinK:S.length-K.length,cajas:S.reduce((a,o)=>a+o.q,0),vend:S.reduce((a,o)=>a+tot(o),0),saldo:Math.max(0,S.filter(o=>o.e==="entregado").reduce((a,o)=>a+tot(o),0)-A.filter(a=>a.cid===cid).reduce((x,a)=>x+a.m,0)),last:S.map(o=>o.d).sort().pop()||null,S};}
+function stats(cid){const S=sales().filter(o=>o.cid===cid);const K=S.filter(o=>o.k!=null);return{n:S.length,costo:K.reduce((a,o)=>a+o.q*o.k,0),vk:K.reduce((a,o)=>a+tot(o),0),sinK:S.length-K.length,cajas:S.reduce((a,o)=>a+uq(o),0),vend:S.reduce((a,o)=>a+tot(o),0),saldo:Math.max(0,S.filter(o=>o.e==="entregado").reduce((a,o)=>a+tot(o),0)-A.filter(a=>a.cid===cid).reduce((x,a)=>x+a.m,0)),last:S.map(o=>o.d).sort().pop()||null,S};}
 function renderCli(){
  $("#cT").innerHTML=chipsH([["Restaurantes"],["Productos"]],ctab,"ctab");
  const pt=ctab==="Productos";$("#cq").hidden=pt;$("#cNew").dataset.a=pt?"newp":"newc";$("#cNew").textContent=pt?"+ Nuevo producto":"+ Nuevo";
- if(pt){$("#cL").innerHTML=PR.length?PR.map(p=>`<div class="li"><div><b>${esc(p.n)}</b><div class="sub">${esc(p.u||"pieza")} · ${plist(p).length?plist(p).map(M).join(", "):"sin precios todavía"}${p.k!=null?" · costo "+M(p.k):""}</div></div><button class="btn o sm" data-a="editp" data-id="${p.id}">Editar</button></div>`).join(""):`<div class="empty"><b>Aún no hay productos</b>Agrega lo que vendes, con su unidad y su precio base. Aparecen al armar los pedidos.</div>`;return;}
+ if(pt){$("#cL").innerHTML=PR.length?PR.map(p=>`<div class="li"><div><b>${esc(p.n)}</b><div class="sub">${esc(p.u||"pieza")} · ${plist(p).length?plist(p).map(M).join(", "):"sin precios todavía"}${isBox(p)&&plistK(p).length?" · kilo: "+plistK(p).map(M).join(", "):""}${p.k!=null?" · costo "+M(p.k):""}</div>${calList(p).length?`<div class="sub">Calibres: ${calList(p).map(esc).join(", ")}</div>`:""}</div><button class="btn o sm" data-a="editp" data-id="${p.id}">Editar</button></div>`).join(""):`<div class="empty"><b>Aún no hay productos</b>Agrega lo que vendes, con su unidad y su precio base. Aparecen al armar los pedidos.</div>`;return;}
  const q=($("#cq").value||"").toLowerCase().trim();
  const L=C.filter(c=>!q||(c.n||"").toLowerCase().includes(q));
  $("#cL").innerHTML=L.length?L.map(c=>{const s=stats(c.id);return `<div class="li"><div><b>${esc(c.n)}</b><div class="sub">${c.a&&!/^https?:/i.test(c.a)?esc(c.a):(c.tel?esc(c.tel):"Sin dirección")}</div>${s.saldo?`<span class="tag pendiente">Debe ${M(s.saldo)}</span>`:""}</div><div class="row2" style="justify-content:flex-end"><button class="btn sm" data-a="addc" data-id="${c.id}">Al pedido</button><button class="btn o sm" data-a="infoc" data-id="${c.id}">Más info</button></div></div>`;}).join(""):`<div class="empty"><b>${C.length?"Sin resultados":"Aún no hay restaurantes"}</b>${C.length?"Prueba con otro nombre.":"Toca «+ Nuevo» para guardar el primero."}</div>`;}
@@ -411,7 +435,7 @@ function openClient(c){const s=c?stats(c.id):null;
  let wk="";if(s){const t=monday(ymd()),d=[];for(let i=7;i>=0;i--){const a=addD(t,-7*i),b=addD(a,7);d.push({l:fmt(a),v:s.S.filter(o=>o.d>=a&&o.d<b).reduce((x,o)=>x+tot(o),0)});}wk=chart(d,{h:170,label:"Ventas semanales de "+c.n});}
  const gan=s?s.vk-s.costo:0;
  sheet(`<div class="shh"><h2>${c?esc(c.n):"Nuevo restaurante"}</h2><button class="btn o sm" data-a="x">Cerrar</button></div>
- ${s?`<div class="kpis two"><div class="k"><b>${M(s.vend)}</b><span>vendido en total</span></div><div class="k"><b>${s.vk?M(s.costo):"—"}</b><span>costo de lo vendido</span></div><div class="k ${s.vk&&gan>=0?"big":""}"><b>${s.vk?M(gan):"—"}</b><span>${s.vk?"ganancia · "+Math.round(gan/s.vk*100)+"% de margen":"ganancia (falta capturar costos)"}</span></div><div class="k ${s.saldo?"neg":""}"><b>${M(s.saldo)}</b><span>por cobrar</span></div><div class="k"><b>${s.cajas}</b><span>unidades compradas</span></div><div class="k"><b>${s.last?fmt(s.last):"—"}</b><span>última compra</span></div></div>${s.sinK?`<p class="hint">${s.sinK} ${s.sinK===1?"pedido sin costo no cuenta":"pedidos sin costo no cuentan"} en la ganancia.</p>`:""}<div class="card"><h2>Ventas por semana</h2>${wk}</div>`:""}
+ ${s?`<div class="kpis two"><div class="k"><b>${M(s.vend)}</b><span>vendido en total</span></div><div class="k"><b>${s.vk?M(s.costo):"—"}</b><span>costo de lo vendido</span></div><div class="k ${s.vk&&gan>=0?"big":""}"><b>${s.vk?M(gan):"—"}</b><span>${s.vk?"ganancia · "+Math.round(gan/s.vk*100)+"% de margen":"ganancia (falta capturar costos)"}</span></div><div class="k ${s.saldo?"neg":""}"><b>${M(s.saldo)}</b><span>por cobrar</span></div><div class="k"><b>${R1(s.cajas)}</b><span>cajas compradas</span></div><div class="k"><b>${s.last?fmt(s.last):"—"}</b><span>última compra</span></div></div>${s.sinK?`<p class="hint">${s.sinK} ${s.sinK===1?"pedido sin costo no cuenta":"pedidos sin costo no cuentan"} en la ganancia.</p>`:""}<div class="card"><h2>Ventas por semana</h2>${wk}</div>`:""}
  <div class="f"><div class="w"><label for="cn">Nombre</label><input id="cn" autocomplete="off" value="${esc(c&&c.n)}"></div>
  <div class="w"><label for="ct">Teléfono</label><input id="ct" inputmode="tel" value="${esc(c&&c.tel)}"></div>
  <div class="w"><label for="ca">Dirección o enlace de Google Maps</label><input id="ca" autocomplete="off" value="${esc(c&&c.a)}"></div>
@@ -428,22 +452,31 @@ function openClient(c){const s=c?stats(c.id):null;
   if(c)$("#cd").onclick=function(){arm(this,async()=>{if(await W(()=>DB.doc("clientes/"+c.id).delete(),"Restaurante eliminado"))closeSheet();},"Eliminar restaurante");};
  });}
 function openProduct(p){
- const pl=plist(p).slice();
+ const pl=plist(p).slice(),plk=plistK(p).slice(),cal=p?calList(p).slice():["Extra","Mediano","1A"];
+ const ed=(id,ph,btn)=>`<div class="row2" style="margin-top:3px;flex-wrap:nowrap"><input id="${id}n" ${ph==="Ej. 850"||ph==="Ej. 85"?'type="number" inputmode="decimal" min="0"':'type="text" autocomplete="off"'} placeholder="${ph}" style="flex:1;margin:0;min-width:0"><button class="btn o" id="${id}a" type="button">${btn}</button></div><div class="chips" id="${id}l" style="margin:8px 0 0"></div>`;
  sheet(`<div class="shh"><h2>${p?"Editar producto":"Nuevo producto"}</h2><button class="btn o sm" data-a="x">Cerrar</button></div>
- <div class="f"><div class="w"><label for="pn2">Nombre</label><input id="pn2" autocomplete="off" placeholder="Ej. Aguacate Hass Extra 1A" value="${esc(p&&p.n)}"></div>
- <div><label for="pu">Se vende por</label><input id="pu" list="pul" placeholder="caja 10 kg" value="${esc(p&&p.u)}"><datalist id="pul"><option value="caja 10 kg"></option><option value="kilo"></option><option value="pieza"></option><option value="bolsa"></option><option value="costal"></option></datalist></div>
- <div><label for="pk">Costo por unidad (opcional)</label><input id="pk" type="number" inputmode="decimal" min="0" value="${p&&p.k!=null?p.k:""}"></div>
- <div class="w"><label for="pnw">Precios que manejas</label><div class="row2" style="margin-top:3px;flex-wrap:nowrap"><input id="pnw" type="number" inputmode="decimal" min="0" placeholder="Ej. 850" style="flex:1;margin:0;min-width:0"><button class="btn o" id="pad" type="button">Agregar precio</button></div><div class="chips" id="ppl" style="margin:8px 0 0"></div></div></div>
- <p class="hint" style="margin-top:8px">Estos precios aparecen en una lista al armar el pedido. El costo se llena solo en cada pedido y lo puedes cambiar. Cambiarlos no modifica pedidos ya hechos.</p>
+ <div class="f"><div class="w"><label for="pn2">Nombre</label><input id="pn2" autocomplete="off" placeholder="Ej. Aguacate Hass" value="${esc(p&&p.n)}"></div>
+ <div><label for="pu">Se vende por</label><input id="pu" list="pul" placeholder="caja 10 kg" value="${esc(p?p.u:"caja 10 kg")}"><datalist id="pul"><option value="caja 10 kg"></option><option value="kilo"></option><option value="pieza"></option><option value="bolsa"></option><option value="costal"></option></datalist></div>
+ <div><label for="pk" id="pkl">Costo por caja (opcional)</label><input id="pk" type="number" inputmode="decimal" min="0" value="${p&&p.k!=null?p.k:""}"></div>
+ <div class="w"><label>Calibres (se escogen al armar el pedido)</label>${ed("pc","Ej. Extra","Agregar calibre")}</div>
+ <div class="w"><label id="ppl0">Precio por caja</label>${ed("pp","Ej. 850","Agregar precio")}</div>
+ <div class="w" id="pkw"><label>Precio por kilo</label>${ed("pq","Ej. 85","Agregar precio")}</div></div>
+ <p class="hint" style="margin-top:8px">Si el producto es por caja, en cada pedido eliges si lo vendes por <b>caja (10 kg)</b> o por <b>kilos</b>, cada uno con su precio. El costo por kilo se calcula solo (costo de la caja entre 10). Cambiar esto no modifica pedidos ya hechos.</p>
  <button class="btn w" id="pg">${p?"Guardar cambios":"Guardar producto"}</button>${p?`<button class="btn d w" id="pdl" data-id="${p.id}" style="margin-top:8px">Eliminar producto</button>`:""}`,()=>{
-  const draw=()=>{$("#ppl").innerHTML=pl.length?pl.map((v,i)=>`<span class="chip" style="display:inline-flex;gap:8px;align-items:center">${M(v)}<button data-i="${i}" aria-label="Quitar ${M(v)}" style="border:0;background:none;font-weight:800;color:var(--pend);min-height:0;padding:0 2px">×</button></span>`).join(""):'<span class="sub">Aún sin precios. Si lo dejas así, los escribes al armar cada pedido.</span>';};
-  const add=()=>{const v=parseFloat($("#pnw").value);if($("#pnw").value===""||!(v>=0))return false;if(!pl.includes(v))pl.push(v);pl.sort((a,b)=>a-b);$("#pnw").value="";draw();return true;};
-  $("#ppl").onclick=e=>{const b=e.target.closest("button[data-i]");if(b){pl.splice(+b.dataset.i,1);draw();}};
-  $("#pad").onclick=()=>{if(!add())toast("Escribe un precio");};
-  draw();
+  const chip=(t,i,id)=>`<span class="chip" style="display:inline-flex;gap:8px;align-items:center">${esc(t)}<button data-i="${i}" aria-label="Quitar ${esc(t)}" style="border:0;background:none;font-weight:800;color:var(--pend);min-height:0;padding:0 2px">×</button></span>`;
+  const mk=(id,arr,isNum,empty)=>{const draw=()=>{$("#"+id+"l").innerHTML=arr.length?arr.map((v,i)=>chip(isNum?M(v):v,i,id)).join(""):`<span class="sub">${empty}</span>`;};
+   const add=()=>{const raw=$("#"+id+"n").value.trim();if(raw==="")return false;if(isNum){const v=parseFloat(raw);if(!(v>=0))return false;if(!arr.includes(v))arr.push(v);arr.sort((a,b)=>a-b);}else{if(!arr.some(x=>x.toLowerCase()===raw.toLowerCase()))arr.push(raw);}$("#"+id+"n").value="";draw();return true;};
+   $("#"+id+"l").onclick=e=>{const b=e.target.closest("button[data-i]");if(b){arr.splice(+b.dataset.i,1);draw();}};
+   $("#"+id+"a").onclick=()=>{if(!add())toast(isNum?"Escribe un precio":"Escribe el calibre");};
+   $("#"+id+"n").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add();}};draw();return add;};
+  const addC=mk("pc",cal,false,"Sin calibres. Si lo dejas así, no se pregunta el calibre al armar el pedido.");
+  const addP=mk("pp",pl,true,"Aún sin precios. Si lo dejas así, los escribes al armar cada pedido.");
+  const addK=mk("pq",plk,true,"Aún sin precios por kilo.");
+  const tog=()=>{const bx=/caja/i.test($("#pu").value);$("#pkw").hidden=!bx;$("#pkl").textContent=bx?"Costo por caja (opcional)":"Costo por unidad (opcional)";$("#ppl0").textContent=bx?"Precio por caja":"Precios que manejas";};
+  $("#pu").oninput=tog;tog();
   $("#pg").onclick=async()=>{const n=$("#pn2").value.trim();if(!n){toast("Escribe el nombre del producto");return;}
-   add();const kv=$("#pk").value===""?null:parseFloat($("#pk").value);if(kv!==null&&!(kv>=0)){toast("Revisa el costo");return;}
-   const d={n,u:$("#pu").value.trim()||"pieza",pl,k:kv,cr:(p&&p.cr)||Date.now()};
+   addC();addP();addK();const kv=$("#pk").value===""?null:parseFloat($("#pk").value);if(kv!==null&&!(kv>=0)){toast("Revisa el costo");return;}
+   const u=$("#pu").value.trim()||"pieza",d={n,u,pl,plk:/caja/i.test(u)?plk:[],cal,k:kv,cr:(p&&p.cr)||Date.now()};
    if(await W(()=>p?DB.doc("productos/"+p.id).set(d):DB.collection("productos").doc().set(d),"Producto guardado"))closeSheet();};
   if(p)$("#pdl").onclick=function(){arm(this,async()=>{if(await W(()=>DB.doc("productos/"+p.id).delete(),"Producto eliminado"))closeSheet();},"Eliminar producto");};
  });}
@@ -452,34 +485,34 @@ function openProduct(p){
 function renderVen(){
  $("#vT").innerHTML=chipsH([["Diaria"],["Semanal"]],vper,"vper");
  const S=sales(),t=ymd();let d=[],lab,total,cajas,per;
- if(vper==="Diaria"){for(let i=13;i>=0;i--){const a=addD(t,-i),X=S.filter(o=>o.d===a);d.push({l:pdt(a).getDate(),v:X.reduce((x,o)=>x+tot(o),0),c:X.reduce((x,o)=>x+o.q,0)});}lab="Ventas de los últimos 14 días";per="día";}
- else{const m=monday(t);for(let i=7;i>=0;i--){const a=addD(m,-7*i),b=addD(a,7),X=S.filter(o=>o.d>=a&&o.d<b);d.push({l:fmt(a),v:X.reduce((x,o)=>x+tot(o),0),c:X.reduce((x,o)=>x+o.q,0)});}lab="Ventas de las últimas 8 semanas";per="semana";}
+ if(vper==="Diaria"){for(let i=13;i>=0;i--){const a=addD(t,-i),X=S.filter(o=>o.d===a);d.push({l:pdt(a).getDate(),v:X.reduce((x,o)=>x+tot(o),0),c:X.reduce((x,o)=>x+uq(o),0)});}lab="Ventas de los últimos 14 días";per="día";}
+ else{const m=monday(t);for(let i=7;i>=0;i--){const a=addD(m,-7*i),b=addD(a,7),X=S.filter(o=>o.d>=a&&o.d<b);d.push({l:fmt(a),v:X.reduce((x,o)=>x+tot(o),0),c:X.reduce((x,o)=>x+uq(o),0)});}lab="Ventas de las últimas 8 semanas";per="semana";}
  total=d.reduce((a,x)=>a+x.v,0);cajas=d.reduce((a,x)=>a+x.c,0);
- $("#vK").innerHTML=`<div class="kpis"><div class="k"><b>${M(total)}</b><span>vendido</span></div><div class="k"><b>${cajas}</b><span>unidades</span></div><div class="k"><b>${M(total/d.length)}</b><span>promedio por ${per}</span></div></div>`;
+ $("#vK").innerHTML=`<div class="kpis"><div class="k"><b>${M(total)}</b><span>vendido</span></div><div class="k"><b>${R1(cajas)}</b><span>cajas</span></div><div class="k"><b>${M(total/d.length)}</b><span>promedio por ${per}</span></div></div>`;
  $("#vH").textContent=lab;$("#vC").innerHTML=S.length?chart(d,{label:lab}):`<div class="empty"><b>Aún no hay ventas</b>Cuando marques pedidos como entregados, aparecen aquí.</div>`;
- const mo={};S.forEach(o=>{const k=o.d.slice(0,7);mo[k]=(mo[k]||0)+o.q;});const ks=Object.keys(mo).sort();
+ const mo={};S.forEach(o=>{const k=o.d.slice(0,7);mo[k]=(mo[k]||0)+uq(o);});const ks=Object.keys(mo).sort();
  if(ks.length<3)$("#vE").innerHTML=`<p class="hint">Para ver en qué meses se vende más hacen falta ventas de 3 meses distintos.</p><div class="prog"><i style="width:${ks.length/3*100}%"></i></div><div class="sub">Llevas ${ks.length} de 3 meses.</div>`;
  else{const dd=[];let k=pdt(t);k.setDate(1);const arr=[];for(let i=11;i>=0;i--){const x=new Date(k.getFullYear(),k.getMonth()-i,1);const key=x.getFullYear()+"-"+pad(x.getMonth()+1);arr.push({l:MES[x.getMonth()],v:mo[key]||0});}
-  const best=arr.reduce((a,b)=>b.v>a.v?b:a);$("#vE").innerHTML=`<p class="hint">Unidades vendidas por mes. Hasta ahora el mes más fuerte es ${best.l}.</p>`+chart(arr,{money:false,label:"Unidades por mes"});}
+  const best=arr.reduce((a,b)=>b.v>a.v?b:a);$("#vE").innerHTML=`<p class="hint">Cajas (10 kg) vendidas por mes. Hasta ahora el mes más fuerte es ${best.l}.</p>`+chart(arr,{money:false,label:"Cajas por mes"});}
  const gm={};S.forEach(o=>{const x=gm[o.cid]||(gm[o.cid]={n:o.cn,v:0,c:0,vk:0,sk:0});x.v+=tot(o);if(o.k!=null){x.c+=o.q*o.k;x.vk+=tot(o);}else x.sk++;});
  const GL=Object.values(gm).sort((a,b)=>(b.vk-b.c)-(a.vk-a.c)),skT=GL.reduce((a,x)=>a+x.sk,0);
  $("#vG").innerHTML=GL.length?GL.map(x=>`<div class="li"><div><b>${esc(x.n)}</b><div class="sub">Venta ${M(x.v)} · Costo ${x.vk?M(x.c):"sin capturar"}</div></div><div style="text-align:right"><b>${x.vk?M(x.vk-x.c):"—"}</b><div class="sub">${x.vk?Math.round((x.vk-x.c)/x.vk*100)+"% de margen":""}</div></div></div>`).join("")+(skT?`<p class="hint" style="margin-top:8px">${skT} ${skT===1?"pedido sin costo no cuenta":"pedidos sin costo no cuentan"} en la ganancia. Captura el costo al armar el pedido.</p>`:""):`<div class="empty"><b>Aún no hay ventas</b>Cuando entregues pedidos con su costo, verás cuánto ganas con cada restaurante.</div>`;
  const L=S.sort((a,b)=>a.d<b.d?1:-1).slice(0,15);
- $("#vL").innerHTML=L.length?L.map(o=>`<div class="li"><div><b>${esc(o.cn)}</b><div class="sub">${fmt(o.d)} · ${esc(o.pn||"Aguacate Hass")} · ${o.q} × ${M(o.p)}</div></div><div style="text-align:right"><b>${M(tot(o))}</b><span class="tag ${o.e}">${TAG[o.e]}</span></div></div>`).join(""):`<div class="empty">Sin ventas todavía.</div>`;}
+ $("#vL").innerHTML=L.length?L.map(o=>`<div class="li"><div><b>${esc(o.cn)}</b><div class="sub">${fmt(o.d)} · ${esc(pname(o))} · ${qty(o)} × ${M(o.p)}</div></div><div style="text-align:right"><b>${M(tot(o))}</b><span class="tag ${o.e}">${TAG[o.e]}</span></div></div>`).join(""):`<div class="empty">Sin ventas todavía.</div>`;}
 
 /* ---------- Calendario ---------- */
 let cm=new Date().getFullYear()*12+new Date().getMonth();
 const DOW=["L","M","M","J","V","S","D"];
 const kfmt=n=>n>=1000?(Math.round(n/100)/10)+"k":String(Math.round(n));
 function calIdx(){const I={v:{},u:{},pend:{},ent:{},cob:{},gas:{}};const add=(o,k,v)=>{o[k]=(o[k]||0)+v;};
- sales().forEach(o=>{add(I.v,o.d,tot(o));add(I.u,o.d,o.q);add(I.ent,o.d,1);});
+ sales().forEach(o=>{add(I.v,o.d,tot(o));add(I.u,o.d,uq(o));add(I.ent,o.d,1);});
  P.forEach(o=>{if(o.e==="pendiente")add(I.pend,o.f,1);if(o.cob)add(I.cob,o.cob,tot(o));});
  A.forEach(a=>add(I.cob,a.f,a.m));G.forEach(g=>add(I.gas,g.f,g.m));return I;}
 function renderCal(){const y=Math.floor(cm/12),m=cm%12,I=calIdx(),t=ymd();
  $("#mT").textContent=new Date(y,m,1).toLocaleDateString("es-MX",{month:"long",year:"numeric"});
  const nd=new Date(y,m+1,0).getDate(),off=(new Date(y,m,1).getDay()+6)%7,key=d=>y+"-"+pad(m+1)+"-"+pad(d);
  let mv=0,mc=0,mg=0,mu=0,mx=0;for(let d=1;d<=nd;d++){const k=key(d);mv+=I.v[k]||0;mc+=I.cob[k]||0;mg+=I.gas[k]||0;mu+=I.u[k]||0;mx=Math.max(mx,I.v[k]||0);}
- $("#mK").innerHTML=`<div class="kpis two"><div class="k"><b>${M(mv)}</b><span>vendido (${mu} unidades)</span></div><div class="k"><b>${M(mc)}</b><span>cobrado</span></div><div class="k"><b>${M(mg)}</b><span>gastos e inversiones</span></div><div class="k ${mc-mg<0?"neg":"big"}"><b>${M(mc-mg)}</b><span>cobrado menos gastado</span></div></div>`;
+ $("#mK").innerHTML=`<div class="kpis two"><div class="k"><b>${M(mv)}</b><span>vendido (${R1(mu)} cajas)</span></div><div class="k"><b>${M(mc)}</b><span>cobrado</span></div><div class="k"><b>${M(mg)}</b><span>gastos e inversiones</span></div><div class="k ${mc-mg<0?"neg":"big"}"><b>${M(mc-mg)}</b><span>cobrado menos gastado</span></div></div>`;
  let h=DOW.map(x=>`<div class="dw">${x}</div>`).join("")+"<span></span>".repeat(off);
  for(let d=1;d<=nd;d++){const k=key(d),v=I.v[k]||0,pc=mx?Math.round(v/mx*42):0;
   h+=`<button class="d${k===t?" hoy":""}" data-a="day" data-v="${k}" style="${v?`background:color-mix(in srgb,var(--grass) ${pc}%,var(--sf))`:""}" aria-label="${d}: vendido ${M(v)}"><span>${d}</span><small>${v?"$"+kfmt(v):""}</small><span class="dots">${I.pend[k]?'<i class="dp"></i>':""}${I.ent[k]?'<i class="dv"></i>':""}${I.gas[k]?'<i class="dg"></i>':""}</span></button>`;}
@@ -493,7 +526,7 @@ function openDay(d){const I=calIdx(),dt=pdt(d);
  const gs=G.filter(g=>g.f===d);
  sheet(`<div class="shh"><h2 style="text-transform:capitalize">${dt.toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})}</h2><button class="btn o sm" data-a="x">Cerrar</button></div>
  <div class="kpis"><div class="k"><b>${M(I.v[d]||0)}</b><span>vendido</span></div><div class="k"><b>${M(I.cob[d]||0)}</b><span>cobrado</span></div><div class="k"><b>${M(I.gas[d]||0)}</b><span>gastado</span></div></div>
- <h2 style="margin:8px 0 4px">Pedidos</h2>${ords.length?ords.map(o=>`<div class="li"><div><b>${esc(o.cn)}</b><div class="sub">${esc(o.pn||"Aguacate Hass")} · ${o.q} × ${M(o.p)} = ${M(tot(o))}</div></div><span class="tag ${o.e}">${TAG[o.e]}</span></div>`).join(""):'<div class="sub" style="padding:6px 0">Sin pedidos este día.</div>'}
+ <h2 style="margin:8px 0 4px">Pedidos</h2>${ords.length?ords.map(o=>`<div class="li"><div><b>${esc(o.cn)}</b><div class="sub">${esc(pname(o))} · ${qty(o)} × ${M(o.p)} = ${M(tot(o))}</div></div><span class="tag ${o.e}">${TAG[o.e]}</span></div>`).join(""):'<div class="sub" style="padding:6px 0">Sin pedidos este día.</div>'}
  <h2 style="margin:12px 0 4px">Dinero recibido</h2>${pays.length?pays.map(x=>`<div class="li"><div><b>${esc(x.n)}</b><div class="sub">${esc(x.t)}</div></div><b>${M(x.m)}</b></div>`).join(""):'<div class="sub" style="padding:6px 0">Sin cobros este día.</div>'}
  <h2 style="margin:12px 0 4px">Gastos</h2>${gs.length?gs.map(g=>`<div class="li"><div><b>${esc(g.c)}</b><div class="sub">${esc(g.t)}${g.n?" · "+esc(g.n):""}</div></div><b>${M(g.m)}</b></div>`).join(""):'<div class="sub" style="padding:6px 0">Sin gastos este día.</div>'}
  <button class="btn w" id="dadd" style="margin-top:14px">Añadir pedido a este día</button>`,()=>{$("#dadd").onclick=()=>{closeSheet();openOrder(null,d);};});}
@@ -518,9 +551,9 @@ function renderCie(){
  const pays=[...cobH.map(o=>({t:"Pedido cobrado",n:o.cn,m:tot(o),met:o.m})),...aH.map(a=>({t:"Pago recibido",n:a.cn||"Sin restaurante",m:a.m,met:a.met,id:a.id,no:a.n}))];
  $("#cA").innerHTML=pays.length?pays.map(p=>`<div class="li"><div><b>${esc(p.n)} · ${M(p.m)}</b><div class="sub">${p.t} · ${esc(p.met)}${p.no?" · "+esc(p.no):""}</div></div>${p.id?`<button class="btn d sm" data-a="delp" data-id="${p.id}">Eliminar</button>`:""}</div>`).join(""):`<div class="empty">Aún no registras pagos hoy.</div>`;
  const gas=sum(G.filter(g=>g.f===t&&g.t==="Gasto").map(g=>g.m)),bolsa=ef-gas;
- $("#cC").innerHTML=`<h2>Cierre de hoy</h2><div class="kpis two"><div class="k"><b>${M(sum(vend.map(tot)))}</b><span>vendido (${sum(vend.map(o=>o.q))} unidades)</span></div><div class="k"><b>${M(ef+tr+tj)}</b><span>cobrado</span></div></div>
+ $("#cC").innerHTML=`<h2>Cierre de hoy</h2><div class="kpis two"><div class="k"><b>${M(sum(vend.map(tot)))}</b><span>vendido (${R1(sum(vend.map(uq)))} cajas)</span></div><div class="k"><b>${M(ef+tr+tj)}</b><span>cobrado</span></div></div>
  <div class="li"><span>Efectivo</span><b>${M(ef)}</b></div><div class="li"><span>Transferencia</span><b>${M(tr)}</b></div><div class="li"><span>Tarjeta</span><b>${M(tj)}</b></div><div class="li"><span>Gastado hoy (gasolina, comida…)</span><b>− ${M(gas)}</b></div>
- <div class="k big" style="margin-top:10px"><b>${M(bolsa)}</b><span>Lo que debería haber en tu bolsa</span></div>
+ <div class="k big" style="margin-top:10px"><b>${M(bolsa)}</b><span>Dinero estimado hoy</span></div>
  <label for="cc" style="margin-top:12px">Dinero que contaste</label><input id="cc" type="number" inputmode="decimal" min="0" value="${esc(contado)}"><div id="cx" class="sub" style="margin-top:6px;font-weight:700"></div>`;
  const upd=()=>{const el=$("#cx");if(contado===""){el.textContent="";return;}const d=(+contado)-bolsa;el.className="sub"+(d===0?"":" late");el.textContent=d===0?"Cuadra.":(d<0?"Faltan ":"Sobran ")+M(Math.abs(d));};
  $("#cc").oninput=e=>{contado=e.target.value;upd();};upd();
