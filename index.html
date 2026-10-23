@@ -6,9 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Avorganics">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Avorganics Reparto</title>
@@ -234,7 +231,6 @@ nav button[aria-selected="true"]{background:var(--olive);color:var(--on)}
   <div class="card"><h2>Pagos recibidos hoy</h2><p class="hint">Anota aquí el dinero que te dieron en efectivo, transferencia o tarjeta, aunque sea un abono. Si ya marcaste el pedido como cobrado, no lo anotes otra vez.</p><button class="btn w" data-a="addp">+ Registrar pago recibido</button><div id="cA" style="margin-top:8px"></div></div>
   <div class="card"><h2>Por cobrar</h2><div id="cP"></div></div>
   <div class="card"><h2>Respaldo de tus datos</h2><p class="hint" id="bk"></p><label style="display:flex;gap:10px;align-items:center;font-weight:700;color:var(--ink);font-size:.95rem;margin:4px 0 8px"><input id="bka" type="checkbox" style="width:22px;height:22px;margin:0;min-height:0"> Respaldo automático diario</label><div id="bkl"></div><div class="row2" style="margin:8px 0"><button class="btn o" id="bn">Respaldar ahora</button></div><div class="row2"><button class="btn" id="bd">Descargar respaldo</button><button class="btn o" id="br">Restaurar respaldo</button></div><input id="bf" type="file" accept="application/json,.json" hidden></div>
-  <div class="card"><h2>Cuenta</h2><p class="hint" id="acct"></p><button class="btn o" id="out">Cerrar sesión</button></div>
   <div class="card"><h2>Dejaron de pedir</h2><p class="hint">Restaurantes sin compras desde hace 14 días o más.</p><div id="cI"></div></div>
 </section>
 </div>
@@ -685,75 +681,44 @@ $("#gt").addEventListener("change",fillCat);fillCat();
 render();
 
 let bkRestore=null;
-const FBK="avo-fbcfg",COLS=["clientes","pedidos","gastos","pagos","productos"];
-const getCfg=()=>{try{return JSON.parse(localStorage.getItem(FBK)||"null");}catch(e){return null;}};
-const parseCfg=t=>{const o={};String(t).replace(/([A-Za-z]+)\s*:\s*["']([^"']+)["']/g,(m,k,v)=>{o[k]=v;return m;});return o.apiKey&&o.projectId&&o.appId?o:null;};
-const AERR={"auth/invalid-credential":"Correo o contraseña incorrectos.","auth/wrong-password":"Correo o contraseña incorrectos.","auth/user-not-found":"Ese correo no tiene cuenta. Toca «Crear cuenta».","auth/invalid-email":"Revisa el correo.","auth/email-already-in-use":"Ese correo ya tiene cuenta. Toca «Entrar».","auth/weak-password":"La contraseña necesita al menos 6 caracteres.","auth/network-request-failed":"No hay internet.","auth/operation-not-allowed":"Falta activar Correo/Contraseña en Firebase, en Authentication.","auth/too-many-requests":"Demasiados intentos. Espera un momento."};
-const bkLabel=()=>{let d=null;try{d=localStorage.getItem("avo-bk");}catch(e){}$("#bk").textContent="Tus datos están en tu cuenta. El respaldo automático guarda una copia al día en la misma cuenta, la primera vez que abres la app ese día, y conserva 14 días. Para protegerte si borras el proyecto de Firebase, descarga además un archivo cada semana. Restaurar agrega y reemplaza registros. "+(d?"Último respaldo: "+fmt(d)+".":"Aún no has hecho un respaldo.");};
-function showAuth(title,html){$("#alogo").src=LOGO;$("#at").textContent=title;$("#ab").innerHTML=html;$("#auth").hidden=false;}
-function showSetup(){showAuth("Conectar con Firebase",`<p class="hint">Solo la primera vez en este teléfono. Pega la configuración que te da Firebase, el bloque que empieza con const firebaseConfig.</p><label for="fc">Configuración</label><textarea id="fc" rows="4" placeholder='apiKey: "…", authDomain: "…", projectId: "…", appId: "…"'></textarea><button class="btn w" id="fs" style="margin-top:10px">Guardar y continuar</button><p class="err" id="fe"></p>`);
- $("#fs").onclick=()=>{const c=parseCfg($("#fc").value);if(!c){$("#fe").textContent="No encuentro apiKey, projectId y appId en lo que pegaste. Copia el bloque completo.";return;}try{localStorage.setItem(FBK,JSON.stringify(c));}catch(e){}location.reload();};}
-function showLogin(auth){showAuth("Entrar a Avorganics",`<form id="lf"><label for="le">Correo</label><input id="le" type="email" autocomplete="username" inputmode="email"><label for="lp">Contraseña</label><input id="lp" type="password" autocomplete="current-password"><button class="btn w" id="li" type="submit" style="margin-top:14px">Entrar</button></form><button class="btn o w" id="lc" type="button" style="margin-top:8px">Crear cuenta (solo la primera vez)</button><p class="err" id="lerr"></p><p class="hint">En el segundo teléfono usa el mismo correo y contraseña y toca Entrar.</p><button class="btn o sm" id="lx" type="button">Cambiar configuración de Firebase</button>`);
- const go=async create=>{const em=$("#le").value.trim(),pw=$("#lp").value;if(!em||!pw){$("#lerr").textContent="Escribe tu correo y contraseña.";return;}
-  $("#lerr").textContent="";$("#li").disabled=true;$("#lc").disabled=true;
-  try{if(create)await auth.createUserWithEmailAndPassword(em,pw);else await auth.signInWithEmailAndPassword(em,pw);}catch(e){$("#lerr").textContent=AERR[e.code]||("No se pudo entrar ("+(e.code||"error")+").");}
-  $("#li").disabled=false;$("#lc").disabled=false;};
- $("#lf").onsubmit=e=>{e.preventDefault();go(false);};$("#lc").onclick=()=>go(true);
- $("#lx").onclick=()=>{try{localStorage.removeItem(FBK);}catch(e){}location.reload();};}
-function startApp(user){
- const fs=firebase.firestore();
- try{fs.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
- const base=fs.collection("users").doc(user.uid),col=n=>base.collection(n);
- const fail=e=>toast("No se pudo guardar ("+((e&&e.code)||"error")+")");
- const wrap=r=>({set:d=>{r.set(JSON.parse(JSON.stringify(d))).catch(fail);return Promise.resolve();},update:d=>{r.update(JSON.parse(JSON.stringify(d))).catch(fail);return Promise.resolve();},delete:()=>{r.delete().catch(fail);return Promise.resolve();}});
- DB={collection:n=>({doc:i=>wrap(i?col(n).doc(i):col(n).doc()),onSnapshot:fn=>col(n).onSnapshot(s=>fn({docs:s.docs.map(d=>({id:d.id,data:()=>d.data()}))}),er=>{$("#off").hidden=false;$("#off").textContent="No se pudo leer la base ("+er.code+"). Revisa tu conexión y las reglas de Firebase.";})}),doc:path=>{const a=path.split("/");return wrap(col(a[0]).doc(a[1]));}};
- const sub=(n,set)=>DB.collection(n).onSnapshot(s=>{set(s.docs.map(d=>Object.assign({id:d.id},d.data())));render();});
+const LSK="avo-data",SNK="avo-snaps",COLS=["clientes","pedidos","gastos","pagos","productos"];
+const bkLabel=()=>{let d=null;try{d=localStorage.getItem("avo-bk");}catch(e){}$("#bk").textContent="Tus datos se guardan en este teléfono. Si borras los datos del navegador, desinstalas la app o pierdes el teléfono, se pierden. El respaldo automático guarda una copia al día dentro del teléfono y conserva 7 días. Descarga además un archivo cada semana y guárdalo en tu Drive o mándatelo por WhatsApp. "+(d?"Último archivo descargado: "+fmt(d)+".":"Aún no has descargado un archivo.");};
+(function startLocal(){
+ const store={};COLS.forEach(n=>{store[n]={};});
+ try{const t=localStorage.getItem(LSK);if(t){const o=JSON.parse(t);COLS.forEach(n=>{if(o[n])store[n]=o[n];});}}catch(e){}
  const byN=(a,b)=>(a.n||"").localeCompare(b.n||"","es");
- sub("clientes",x=>{C=x.sort(byN);});sub("pedidos",x=>{P=x;});sub("gastos",x=>{G=x;});sub("pagos",x=>{A=x;});let seeded=false;
- col("productos").onSnapshot(s=>{PR=s.docs.map(d=>Object.assign({id:d.id},d.data())).sort(byN);render();
-  if(!s.metadata.fromCache&&s.empty&&!seeded){seeded=true;const t=Date.now();
-   [["aguacate",{n:"Aguacate",u:"caja",kc:10,cal:["Super","Extra","1A","Mediano"],cr:t}],["limon",{n:"Limón",u:"kg",kc:10,cal:[],cr:t+1}],["maracuya",{n:"Maracuyá",u:"kg",kc:10,cal:[],cr:t+2}]].forEach(x=>col("productos").doc(x[0]).set(x[1]).catch(()=>{}));}},
-  er=>{$("#off").hidden=false;$("#off").textContent="No se pudo leer la base ("+er.code+"). Revisa tu conexión y las reglas de Firebase.";});
- $("#acct").textContent="Sesión iniciada como "+user.email+".";
- $("#out").onclick=function(){arm(this,()=>{firebase.auth().signOut();},"Cerrar sesión");};
- bkLabel();
- const dump=async()=>{const o={app:"avorganics",v:1,data:{}};for(const n of COLS){const s=await col(n).get();o.data[n]={};s.docs.forEach(d=>{o.data[n][d.id]=d.data();});}return JSON.stringify(o);};
- const load=async str=>{const d=JSON.parse(str);if(!d||d.app!=="avorganics"||typeof d.data!=="object")throw new Error("x");let b=fs.batch(),k=0;for(const n of COLS){for(const [id,v] of Object.entries(d.data[n]||{})){b.set(col(n).doc(id),v);if(++k%400===0){await b.commit();b=fs.batch();}}}await b.commit();};
- $("#bd").onclick=async()=>{try{const t=await dump();const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"application/json"}));a.download="avorganics-respaldo-"+ymd()+".json";document.body.appendChild(a);a.click();a.remove();try{localStorage.setItem("avo-bk",ymd());}catch(e){}bkLabel();toast("Respaldo descargado");}catch(e){toast("No se pudo crear el respaldo");}};
- $("#br").onclick=function(){arm(this,()=>$("#bf").click(),"Restaurar respaldo");};
- $("#bf").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{await load(await f.text());toast("Respaldo restaurado");}catch(er){toast("Ese archivo no es un respaldo válido");}};
-
- const mcol=base.collection("respaldos"),metaDoc=base.collection("meta").doc("backup"),CH=300000;let BK={},busy=false;
- const renderBk=()=>{$("#bka").checked=BK.auto!==false;const ds=Object.keys(BK.days||{}).sort().reverse();
+ const save=()=>{try{localStorage.setItem(LSK,JSON.stringify(store));return true;}catch(e){toast("No se pudo guardar: la memoria del teléfono está llena.");return false;}};
+ const arr=n=>Object.entries(store[n]).map(([id,v])=>Object.assign({id},v));
+ const apply=()=>{C=arr("clientes").sort(byN);P=arr("pedidos");G=arr("gastos");A=arr("pagos");PR=arr("productos").sort(byN);render();};
+ const clone=d=>JSON.parse(JSON.stringify(d));
+ const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+ const wrap=(n,id)=>({set:d=>{store[n][id]=clone(d);save();apply();return Promise.resolve();},update:d=>{store[n][id]=Object.assign({},store[n][id]||{},clone(d));save();apply();return Promise.resolve();},delete:()=>{delete store[n][id];save();apply();return Promise.resolve();}});
+ DB={collection:n=>({doc:i=>wrap(n,i||rid())}),doc:p=>{const a=p.split("/");return wrap(a[0],a[1]);}};
+ let seeded=false;try{seeded=localStorage.getItem("avo-seed")==="1";}catch(e){}
+ if(!seeded&&!Object.keys(store.productos).length){const t=Date.now();
+  store.productos={aguacate:{n:"Aguacate",u:"caja",kc:10,cal:["Super","Extra","1A","Mediano"],cr:t},limon:{n:"Limón",u:"kg",kc:10,cal:[],cr:t+1},maracuya:{n:"Maracuyá",u:"kg",kc:10,cal:[],cr:t+2}};
+  save();try{localStorage.setItem("avo-seed","1");}catch(e){}}
+ const snaps=()=>{try{return JSON.parse(localStorage.getItem(SNK)||"{}");}catch(e){return {};}};
+ const putSnaps=o=>{try{localStorage.setItem(SNK,JSON.stringify(o));return true;}catch(e){return false;}};
+ const autoOn=()=>{try{return localStorage.getItem("avo-auto")!=="0";}catch(e){return true;}};
+ const renderBk=()=>{$("#bka").checked=autoOn();const ds=Object.keys(snaps()).sort().reverse();
   $("#bkl").innerHTML=ds.length?ds.map(d=>`<div class="li"><div><b>${fmt(d)}</b><div class="sub">Copia automática</div></div><button class="btn o sm" data-a="bkr" data-id="${d}">Restaurar</button></div>`).join(""):'<div class="sub">Aún no hay copias automáticas.</div>';};
- const snapNow=async()=>{if(busy||!navigator.onLine)return false;busy=true;try{
-   const day=ymd(),parts={},b=fs.batch();
-   for(const n of COLS){const s=await col(n).get({source:"server"}),o={};s.docs.forEach(d=>{o[d.id]=d.data();});
-    const t=JSON.stringify(o),np=Math.max(1,Math.ceil(t.length/CH));parts[n]=np;
-    for(let k=0;k<np;k++)b.set(mcol.doc(day+"__"+n+"__"+k),{day,col:n,k,json:t.slice(k*CH,(k+1)*CH)});}
-   const days=Object.assign({},BK.days||{});days[day]=parts;
-   const keep=Object.keys(days).sort().reverse().slice(0,14);
-   Object.keys(days).filter(x=>!keep.includes(x)).forEach(x=>{Object.entries(days[x]).forEach(([n,np])=>{for(let k=0;k<np;k++)b.delete(mcol.doc(x+"__"+n+"__"+k));});delete days[x];});
-   b.set(metaDoc,{auto:BK.auto!==false,last:day,days});
-   await Promise.race([b.commit(),new Promise((_,r)=>setTimeout(()=>r(new Error("tiempo")),30000))]);
-   return true;}catch(e){return false;}finally{busy=false;}};
- const maybeAuto=()=>{if(BK.loaded&&BK.auto!==false&&BK.last!==ymd())snapNow().then(ok=>{if(ok)toast("Respaldo automático guardado");});};
- metaDoc.onSnapshot(d=>{BK=Object.assign({loaded:true},d.exists?d.data():{});renderBk();maybeAuto();},()=>{});
+ const snapNow=()=>{const o=snaps(),day=ymd();o[day]=JSON.stringify(store);
+  let keep=Object.keys(o).sort().reverse().slice(0,7),n={};keep.forEach(k=>{n[k]=o[k];});
+  if(!putSnaps(n)){keep=keep.slice(0,2);n={};keep.forEach(k=>{n[k]=o[k];});if(!putSnaps(n))return false;}
+  try{localStorage.setItem("avo-snapday",day);}catch(e){}renderBk();return true;};
+ const maybeAuto=()=>{let last="";try{last=localStorage.getItem("avo-snapday")||"";}catch(e){}
+  if(autoOn()&&last!==ymd()&&Object.keys(store.pedidos).length+Object.keys(store.clientes).length>0){if(snapNow())toast("Respaldo automático guardado");}};
+ const dump=()=>JSON.stringify({app:"avorganics",v:1,data:store});
+ const load=str=>{const d=JSON.parse(str);if(!d||d.app!=="avorganics"||typeof d.data!=="object")throw new Error("x");COLS.forEach(n=>{Object.assign(store[n],d.data[n]||{});});save();apply();};
+ $("#bd").onclick=()=>{try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([dump()],{type:"application/json"}));a.download="avorganics-respaldo-"+ymd()+".json";document.body.appendChild(a);a.click();a.remove();try{localStorage.setItem("avo-bk",ymd());}catch(e){}bkLabel();toast("Respaldo descargado");}catch(e){toast("No se pudo crear el respaldo");}};
+ $("#br").onclick=function(){arm(this,()=>$("#bf").click(),"Restaurar respaldo");};
+ $("#bf").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{load(await f.text());toast("Respaldo restaurado");}catch(er){toast("Ese archivo no es un respaldo válido");}};
+ $("#bn").onclick=()=>{toast(snapNow()?"Respaldo guardado":"No se pudo respaldar: memoria llena.");};
+ $("#bka").onchange=e=>{try{localStorage.setItem("avo-auto",e.target.checked?"1":"0");}catch(x){}};
+ bkRestore=day=>{try{const s=JSON.parse(snaps()[day]);COLS.forEach(n=>{store[n]=s[n]||{};});save();apply();toast("Copia del "+fmt(day)+" restaurada");}catch(e){toast("No se pudo restaurar la copia");}};
  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")maybeAuto();});
- $("#bka").onchange=e=>{metaDoc.set({auto:e.target.checked,last:BK.last||null,days:BK.days||{}}).catch(()=>{});};
- $("#bn").onclick=async()=>{toast("Guardando respaldo…");const ok=await snapNow();toast(ok?"Respaldo guardado":"No se pudo respaldar. Revisa tu internet.");};
- bkRestore=async day=>{try{const meta=(BK.days||{})[day];if(!meta)throw new Error("x");let b=fs.batch(),k=0;
-   for(const n of COLS){let t="";for(let i=0;i<(meta[n]||0);i++){const d=await mcol.doc(day+"__"+n+"__"+i).get();t+=d.exists?d.data().json:"";}
-    const o=t?JSON.parse(t):{};for(const [id,v] of Object.entries(o)){b.set(col(n).doc(id),v);if(++k%400===0){await b.commit();b=fs.batch();}}}
-   await b.commit();toast("Copia del "+fmt(day)+" restaurada");}catch(e){toast("No se pudo restaurar la copia");}};
-}
-(function boot(){
- const cfg=getCfg();
- if(!cfg){showSetup();return;}
- if(typeof firebase==="undefined"){showAuth("Sin conexión","<p class=\"hint\">La primera vez necesitas internet para cargar la app. Conéctate y vuelve a abrirla.</p>");return;}
- try{firebase.initializeApp(cfg);}catch(e){}
- const auth=firebase.auth();let started=false;
- auth.onAuthStateChanged(u=>{if(u){if(!started){started=true;startApp(u);}$("#auth").hidden=true;}else{if(started){location.reload();return;}showLogin(auth);}});
+ apply();renderBk();bkLabel();maybeAuto();
 })();
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
