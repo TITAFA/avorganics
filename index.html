@@ -248,11 +248,11 @@ nav button[aria-selected="true"]{background:var(--olive);color:var(--on)}
 <nav>
   <button data-a="go" data-v="hoy" aria-selected="true">Hoy</button>
   <button data-a="go" data-v="cli" aria-selected="false">Clientes</button>
-  <button data-a="go" data-v="car" aria-selected="false">Carga</button>
   <button data-a="go" data-v="ven" aria-selected="false">Ventas</button>
   <button data-a="go" data-v="gas" aria-selected="false">Gastos</button>
   <button data-a="go" data-v="cie" aria-selected="false">Cierre</button>
   <button data-a="go" data-v="cal" aria-selected="false">Calendario</button>
+  <button data-a="go" data-v="car" aria-selected="false">Carga</button>
 </nav>
 <div id="ov"><div id="sh" role="dialog" aria-modal="true"></div></div>
 <div id="ts" role="status"></div>
@@ -609,7 +609,8 @@ function renderCar(){
  L.forEach(c=>(c.rows||[]).forEach(r=>{const key=c.pn+"|"+(r.cal||"")+"|"+c.u,x=g[key]||(g[key]={n:c.pn,cal:r.cal||"",u:c.u,q:0,v:0,qp:0});x.q+=r.q;if(r.p!=null){x.v+=r.q*r.p;x.qp+=r.q;}tv+=r.p!=null?r.q*r.p:0;if(c.u!=="kg")tc+=r.q;}));
  $("#rK").innerHTML=`<div class="kpis"><div class="k"><b>${L.length}</b><span>${L.length===1?"carga":"cargas"}</span></div><div class="k"><b>${R1(tc)}</b><span>cajas llegadas</span></div><div class="k"><b>${M(tv)}</b><span>costo total</span></div></div>`;
  const G2=Object.values(g).sort((a,b)=>a.n.localeCompare(b.n,"es"));
- $("#rB").innerHTML=G2.length?G2.map(x=>`<div class="li"><div><b>${esc(x.n)}${x.cal?" · "+esc(x.cal):""}</b><div class="sub">${x.qp?"Precio promedio "+M(x.v/x.qp):"Sin precio"}${x.u==="kg"?" por kg":" por caja"}</div></div><div style="text-align:right"><b>${R1(x.q)} ${kU(x)}</b><div class="sub">${x.qp?M(x.v):""}</div></div></div>`).join(""):`<div class="empty"><b>Aún no hay cargas</b>Toca “+ Nueva carga” cuando llegue el camión.</div>`;
+ const tl=G2.length>1?`<div class="li" style="border-top:2px solid var(--olive)"><b>TOTAL</b><div style="text-align:right"><b>${R1(tc)} cajas</b><div class="sub">${M(tv)}</div></div></div>`:"";
+ $("#rB").innerHTML=G2.length?G2.map(x=>`<div class="li"><div><b>${esc(x.n)}${x.cal?" · "+esc(x.cal):""}</b><div class="sub">${x.qp?"Precio promedio "+M(x.v/x.qp):"Sin precio"}${x.u==="kg"?" por kg":" por caja"}</div></div><div style="text-align:right"><b>${R1(x.q)} ${kU(x)}</b><div class="sub">${x.qp?M(x.v):""}</div></div></div>`).join("")+tl:`<div class="empty"><b>Aún no hay cargas</b>Toca “+ Nueva carga” cuando llegue el camión.</div>`;
  $("#rL").innerHTML=L.length?L.map(c=>{const t=(c.rows||[]).reduce((a,r)=>a+(r.p!=null?r.q*r.p:0),0),q=(c.rows||[]).reduce((a,r)=>a+r.q,0);
   return `<div class="li" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><div>${ico(iconKey({n:c.pn,ic:c.ic}),26)} <b>${esc(c.pn)}</b><div class="sub">${fmt(c.f)}${c.n?" · "+esc(c.n):""}</div></div><div style="text-align:right"><b>${R1(q)} ${kU(c)}</b><div class="sub">${t?M(t):""}</div></div></div>${(c.rows||[]).map(r=>`<div class="sub">${r.cal?esc(r.cal)+" · ":""}${R1(r.q)} ${kU(c)}${r.p!=null?" × "+M(r.p)+" = "+M(r.q*r.p):""}</div>`).join("")}<button class="btn d sm" style="margin-top:8px" data-a="delcar" data-id="${c.id}">Eliminar</button></div>`;}).join(""):`<div class="empty">Sin cargas ${rper==="Todo"?"todavía":"este mes"}.</div>`;}
 function openCarga(){
@@ -619,11 +620,11 @@ function openCarga(){
  <div class="f"><div class="w"><label for="kf">¿Qué día llegó el camión?</label><input id="kf" type="date" value="${ymd()}"></div>
  <div class="w"><label for="kp">Producto</label><select id="kp">${PR.map(p=>`<option value="${p.id}" ${p.id===first.id?"selected":""}>${esc(p.n)}</option>`).join("")}</select></div></div>
  <div id="krows" style="margin-top:10px"></div>
- <div class="card" style="margin:10px 0 0"><b id="ktot"></b></div>
+ <div class="card" style="margin:10px 0 0"><div id="ksub"></div><b id="ktot" style="display:block;font-size:1.1rem"></b></div>
  <div class="f" style="margin-top:10px"><div class="w"><label for="kn">Nota (opcional)</label><input id="kn" autocomplete="off" placeholder="Ej. Camión de don Juan"></div></div>
  <button class="btn w" id="kg" style="margin-top:12px">Guardar carga</button>`,()=>{
   const cur=()=>PR.find(p=>p.id===$("#kp").value);
-  const calc=()=>{const p=cur(),u=isBox(p)?"cajas":"kg";let q=0,v=0;document.querySelectorAll(".kr").forEach(r=>{const a=parseFloat(r.querySelector(".kq").value)||0,b=parseFloat(r.querySelector(".kpv").value);q+=a;const t=a>0&&b>=0?a*b:0;v+=t;r.querySelector(".kt").textContent=a>0&&b>=0?M(t):"";});$("#ktot").textContent="Total: "+R1(q)+" "+u+(v?" · "+M(v):"");};
+  const calc=()=>{const p=cur(),u=isBox(p)?"cajas":"kg";let q=0,v=0;let sub="";document.querySelectorAll(".kr").forEach(r=>{const a=parseFloat(r.querySelector(".kq").value)||0,b=parseFloat(r.querySelector(".kpv").value);q+=a;const t=a>0&&b>=0?a*b:0;v+=t;r.querySelector(".kt").textContent=a>0&&b>=0?M(t):"";if(a>0)sub+=`<div style="display:flex;justify-content:space-between"><span>${esc(r.dataset.c||"Total")}: ${R1(a)} ${u}</span><span>${t?M(t):""}</span></div>`;});$("#ksub").innerHTML=sub;$("#ktot").textContent="TOTAL: "+R1(q)+" "+u+(v?" · "+M(v):"");};
   const draw=()=>{const p=cur(),cl=calList(p),box=isBox(p),L=cl.length?cl:[""];
    $("#krows").innerHTML=L.map((c,i)=>`<div class="kr prc" data-c="${esc(c)}" style="margin-bottom:8px"><b>${c?esc(c):"Cantidad"}</b><div class="row2" style="flex-wrap:nowrap;margin-top:6px;align-items:end"><div style="flex:1;min-width:0"><label>${box?"Cajas":"Kilos"}</label><input class="kq" type="number" inputmode="decimal" min="0" placeholder="0"></div><div style="flex:1;min-width:0"><label>${box?"Precio por caja":"Precio por kilo"}</label><input class="kpv" type="number" inputmode="decimal" min="0" placeholder="$"></div><b class="kt" style="min-width:64px;text-align:right"></b></div></div>`).join("");
    document.querySelectorAll(".kq,.kpv").forEach(i=>i.oninput=calc);calc();};
